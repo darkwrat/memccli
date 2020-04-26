@@ -53,6 +53,7 @@ void cli_server_dtor(struct cli_server *p);
 void cli_request_dtor(struct cli_request *p);
 void cli_memcached_server_list_dtor(memcached_server_list_st *p);
 void cli_memcached_dtor(memcached_st **p);
+void cli_free_dtor(void **p);
 
 int main(int argc, char *argv[])
 {
@@ -182,14 +183,15 @@ int cli_get(memcached_st *m, struct cli_request req)
 	uint32_t flags;
 	memcached_return r;
 
-	char *v = memcached_get(m, req.key, strlen(req.key), &vlen, &flags, &r);
+	void *v __attribute__((cleanup(cli_free_dtor))) =
+	    memcached_get(m, req.key, strlen(req.key), &vlen, &flags, &r);
 	if (r != MEMCACHED_SUCCESS) {
 		fprintf(stderr, "memcached_get failed: %s\n",
 			memcached_strerror(m, r));
 		return EX_UNAVAILABLE;
 	}
 
-	printf("%.*s\n", (int)vlen, v);
+	fprintf(stdout, "%.*s", (int)vlen, (char*)v);
 
 	return EX_OK;
 }
@@ -251,3 +253,5 @@ void cli_memcached_server_list_dtor(memcached_server_list_st *p)
 }
 
 void cli_memcached_dtor(memcached_st **p) { memcached_free(*p); }
+
+void cli_free_dtor(void **p) { free(*p); }
