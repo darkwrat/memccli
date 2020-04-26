@@ -252,6 +252,10 @@ void cli_memcached_server_list_dtor(memcached_server_list_st *p)
 	memcached_server_list_free(*p);
 }
 
-void cli_memcached_dtor(memcached_st **p) { memcached_free(*p); }
+void cli_memcached_dtor(memcached_st **p)
+{
+	(void)memcached_destroy_sasl_auth_data(*p);
+	memcached_free(*p);
+}
 
 void cli_free_dtor(void **p) { free(*p); }
