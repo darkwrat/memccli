@@ -9,8 +9,6 @@
 
 #include <libmemcached/memcached.h>
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
 struct cli_server {
 	char *host;
 	in_port_t port;
