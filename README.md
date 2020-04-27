@@ -14,10 +14,11 @@ Supported options:
 	--flags <val>, -f <val>
 	--expire <val>, -e <val>
 ```
-When `-k` is provided and `-v` is not provided - executes GET. Returned value is written to stdout.
-
-When both `-k` and `-v` are proveded - executes SET.
-
-When `-k` and `-d` are provided - executes DELETE.
 
 Process exit code is `0` on success.
+
+When `-k` is provided and `-v` is not provided - executes GET. Returned value is written to stdout.
+
+When both `-k` and `-v` are provided - executes SET.
+
+When `-k` and `-d` are provided - executes DELETE.
