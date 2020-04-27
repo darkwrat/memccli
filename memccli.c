@@ -16,6 +16,8 @@ struct cli_server {
 	in_port_t port;
 	char *user;
 	char *pass;
+	uint64_t snd_timeout_us;
+	uint64_t rcv_timeout_us;
 };
 
 #define CLI_REQ_FLAG_DEL 0x1
@@ -31,15 +33,18 @@ struct cli_request {
 
 // clang-format off
 static const struct option longopts[] = {
-    {"host",   required_argument, 0, 'h'},
-    {"port",   required_argument, 0, 'P'},
-    {"key",    required_argument, 0, 'k'},
-    {"value",  required_argument, 0, 'v'},
-    {"del",    no_argument,       0, 'd'},
-    {"user",   required_argument, 0, 'u'},
-    {"pass",   required_argument, 0, 'p'},
-    {"flags",  required_argument, 0, 'f'},
-    {"expire", required_argument, 0, 'e'},
+    {"host",           required_argument, 0, 'h'},
+    {"port",           required_argument, 0, 'P'},
+    {"snd-timeout-us", required_argument, 0, 'r'},
+    {"rcv-timeout-us", required_argument, 0, 'w'},
+    {"key",            required_argument, 0, 'k'},
+    {"value",          required_argument, 0, 'v'},
+    {"del",            no_argument,       0, 'd'},
+    {"user",           required_argument, 0, 'u'},
+    {"pass",           required_argument, 0, 'p'},
+    {"flags",          required_argument, 0, 'f'},
+    {"expire",         required_argument, 0, 'e'},
+    { 0 },
 };
 // clang-format on
 
@@ -63,8 +68,9 @@ int main(int argc, char *argv[])
 	int option_index;
 
 	while (1) {
-		int c = getopt_long(argc, argv, "h:P:k:v:du:p:f:e:", longopts,
-				    &option_index);
+		int c =
+		    getopt_long(argc, argv, "h:P:w:r:k:v:du:p:f:e:", longopts,
+				&option_index);
 		if (c == -1)
 			break;
 
@@ -74,6 +80,12 @@ int main(int argc, char *argv[])
 			break;
 		case 'P':
 			serv.port = atoi(optarg);
+			break;
+		case 'w':
+			serv.snd_timeout_us = atol(optarg);
+			break;
+		case 'r':
+			serv.rcv_timeout_us = atol(optarg);
 			break;
 		case 'k':
 			req.key = strdup(optarg);
@@ -142,7 +154,14 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (serv.snd_timeout_us <= 0)
+		serv.snd_timeout_us = 1000000; /*1s*/
+	if (serv.rcv_timeout_us <= 0)
+		serv.rcv_timeout_us = 1000000; /*1s*/
+
 	uint64_t flags[MEMCACHED_BEHAVIOR_MAX] = {
+	    [MEMCACHED_BEHAVIOR_SND_TIMEOUT] = serv.snd_timeout_us,
+	    [MEMCACHED_BEHAVIOR_RCV_TIMEOUT] = serv.rcv_timeout_us,
 	    [MEMCACHED_BEHAVIOR_TCP_NODELAY] = 1,
 	    [MEMCACHED_BEHAVIOR_BINARY_PROTOCOL] = 1,
 	};
@@ -191,7 +210,7 @@ int cli_get(memcached_st *m, struct cli_request req)
 		return EX_UNAVAILABLE;
 	}
 
-	fprintf(stdout, "%.*s", (int)vlen, (char*)v);
+	fprintf(stdout, "%.*s", (int)vlen, (char *)v);
 
 	return EX_OK;
 }
@@ -226,9 +245,18 @@ int cli_del(memcached_st *m, struct cli_request req)
 __attribute__((noreturn)) void cli_usage(void)
 {
 	fprintf(stderr, "Supported options:\n");
-	for (size_t i = 0; i < ARRAY_SIZE(longopts); i++) {
-		fprintf(stderr, "	-%c, --%s\n", (char)longopts[i].val,
-			longopts[i].name);
+
+	const struct option *opt;
+	for (opt = &longopts[0]; opt->name; opt++) {
+		char *arg = "";
+		if (opt->has_arg == required_argument) {
+			arg = " <val>";
+		} else if (opt->has_arg == optional_argument) {
+			arg = " [val]";
+		}
+
+		fprintf(stderr, "	--%s%s, -%c%s\n", opt->name, arg,
+			(char)opt->val, arg);
 	}
 
 	exit(EX_USAGE);
