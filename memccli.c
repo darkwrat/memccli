@@ -27,6 +27,7 @@ struct cli_request {
 	char *value;
 	uint32_t flags;
 	time_t expire;
+	bool new_record;
 };
 
 // clang-format off
@@ -42,6 +43,7 @@ static const struct option longopts[] = {
     {"pass",           required_argument, 0, 'p'},
     {"flags",          required_argument, 0, 'f'},
     {"expire",         required_argument, 0, 'e'},
+    {"new",            no_argument,       0, 'n'},
     { 0 },
 };
 // clang-format on
@@ -50,6 +52,7 @@ __attribute__((noreturn)) void cli_usage(void);
 
 int cli_get(memcached_st *m, struct cli_request req);
 int cli_set(memcached_st *m, struct cli_request req);
+int cli_add(memcached_st *m, struct cli_request req);
 int cli_del(memcached_st *m, struct cli_request req);
 
 void cli_server_dtor(struct cli_server *p);
@@ -67,7 +70,7 @@ int main(int argc, char *argv[])
 
 	while (1) {
 		int c =
-		    getopt_long(argc, argv, "h:P:w:r:k:v:du:p:f:e:", longopts,
+		    getopt_long(argc, argv, "h:P:w:r:k:v:du:p:f:e:n", longopts,
 				&option_index);
 		if (c == -1)
 			break;
@@ -105,6 +108,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'e':
 			req.expire = atol(optarg);
+			break;
+		case 'n':
+			req.new_record = true;
 			break;
 		case '?':
 			cli_usage();
@@ -186,11 +192,17 @@ int main(int argc, char *argv[])
 
 	if (req.cli_flags & CLI_REQ_FLAG_DEL) {
 		return cli_del(m, req);
-	} else if (req.value) {
-		return cli_set(m, req);
-	} else {
+	} 
+
+	if (req.new_record) {
+		return cli_add(m, req);
+	}
+	
+	if (!req.value) {
 		return cli_get(m, req);
 	}
+	
+	return cli_set(m, req);
 }
 
 int cli_get(memcached_st *m, struct cli_request req)
@@ -209,6 +221,20 @@ int cli_get(memcached_st *m, struct cli_request req)
 	}
 
 	fprintf(stdout, "%.*s", (int)vlen, (char *)v);
+
+	return EX_OK;
+}
+
+int cli_add(memcached_st *m, struct cli_request req)
+{
+	memcached_return r =
+	    memcached_add(m, req.key, strlen(req.key), req.value,
+			  strlen(req.value), req.expire, req.flags);
+	if (r != MEMCACHED_SUCCESS) {
+		fprintf(stderr, "memcached_add failed: %s\n",
+			memcached_strerror(m, r));
+		return EX_UNAVAILABLE;
+	}
 
 	return EX_OK;
 }
