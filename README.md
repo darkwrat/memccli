@@ -1,6 +1,8 @@
 # memccli
 Simple commandline tool for interacting with secure memcached instances over binary protocol.
 ```
+# ./memccli --help
+./memccli: unrecognized option '--help'
 Supported options:
 	--host <val>, -h <val>
 	--port <val>, -P <val>
@@ -8,6 +10,7 @@ Supported options:
 	--rcv-timeout-us <val>, -w <val>
 	--key <val>, -k <val>
 	--value <val>, -v <val>
+	--add, -a
 	--del, -d
 	--user <val>, -u <val>
 	--pass <val>, -p <val>
