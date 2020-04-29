@@ -31,3 +31,5 @@ When both `-k` and `-v` are provided - executes SET.
 When `-k` and `-d` are provided - executes DELETE.
 
 When `-a` is provided -- executes ADD. Iff `-k` and `-v` are also provided.
+
+Option `-a` has priority over `-d`.

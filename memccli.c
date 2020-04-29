@@ -235,20 +235,6 @@ int cli_get(memcached_st *m, struct cli_request req)
 	return EX_OK;
 }
 
-int cli_add(memcached_st *m, struct cli_request req)
-{
-	memcached_return r =
-	    memcached_add(m, req.key, strlen(req.key), req.value,
-			  strlen(req.value), req.expire, req.flags);
-	if (r != MEMCACHED_SUCCESS) {
-		fprintf(stderr, "memcached_add failed: %s\n",
-			memcached_strerror(m, r));
-		return -r + EX__BASE;
-	}
-
-	return EX_OK;
-}
-
 int cli_set(memcached_st *m, struct cli_request req)
 {
 	memcached_return r =
@@ -256,6 +242,20 @@ int cli_set(memcached_st *m, struct cli_request req)
 			  strlen(req.value), req.expire, req.flags);
 	if (r != MEMCACHED_SUCCESS) {
 		fprintf(stderr, "memcached_set failed: %s\n",
+			memcached_strerror(m, r));
+		return -r + EX__BASE;
+	}
+
+	return EX_OK;
+}
+
+int cli_add(memcached_st *m, struct cli_request req)
+{
+	memcached_return r =
+	    memcached_add(m, req.key, strlen(req.key), req.value,
+			  strlen(req.value), req.expire, req.flags);
+	if (r != MEMCACHED_SUCCESS) {
+		fprintf(stderr, "memcached_add failed: %s\n",
 			memcached_strerror(m, r));
 		return -r + EX__BASE;
 	}
