@@ -20,6 +20,10 @@ Supported options:
 
 Process exit code is `0` on success.
 
+Process exit code less than `EX__BASE` is a libmemcached return code for the requested operation, substracted from `EX__BASE`.
+
+Process exit code above `EX__BASE` means an internal error and guarantees that memcached state is untouched.
+
 When `-k` is provided and `-v` is not provided - executes GET. Returned value is written to stdout.
 
 When both `-k` and `-v` are provided - executes SET.
