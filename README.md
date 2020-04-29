@@ -29,3 +29,5 @@ When `-k` is provided and `-v` is not provided - executes GET. Returned value is
 When both `-k` and `-v` are provided - executes SET.
 
 When `-k` and `-d` are provided - executes DELETE.
+
+When `-a` is provided -- executes ADD. Iff `-k` and `-v` are also provided.
