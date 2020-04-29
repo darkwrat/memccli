@@ -18,8 +18,9 @@ struct cli_server {
 	uint64_t rcv_timeout_us;
 };
 
-#define CLI_REQ_FLAG_DEL 0x1
-#define CLI_REQ_FLAG_MAX 0x2
+#define CLI_REQ_FLAG_ADD 0x1
+#define CLI_REQ_FLAG_DEL 0x2
+#define CLI_REQ_FLAG_MAX 0x4
 
 struct cli_request {
 	uint32_t cli_flags;
@@ -37,6 +38,7 @@ static const struct option longopts[] = {
     {"rcv-timeout-us", required_argument, 0, 'w'},
     {"key",            required_argument, 0, 'k'},
     {"value",          required_argument, 0, 'v'},
+    {"add",            no_argument,       0, 'a'},
     {"del",            no_argument,       0, 'd'},
     {"user",           required_argument, 0, 'u'},
     {"pass",           required_argument, 0, 'p'},
@@ -48,8 +50,11 @@ static const struct option longopts[] = {
 
 __attribute__((noreturn)) void cli_usage(void);
 
+int cli_execute(memcached_st *m, struct cli_request req);
+
 int cli_get(memcached_st *m, struct cli_request req);
 int cli_set(memcached_st *m, struct cli_request req);
+int cli_add(memcached_st *m, struct cli_request req);
 int cli_del(memcached_st *m, struct cli_request req);
 
 void cli_server_dtor(struct cli_server *p);
@@ -67,7 +72,7 @@ int main(int argc, char *argv[])
 
 	while (1) {
 		int c =
-		    getopt_long(argc, argv, "h:P:w:r:k:v:du:p:f:e:", longopts,
+		    getopt_long(argc, argv, "h:P:w:r:k:v:adu:p:f:e:", longopts,
 				&option_index);
 		if (c == -1)
 			break;
@@ -91,6 +96,9 @@ int main(int argc, char *argv[])
 		case 'v':
 			req.value = strdup(optarg);
 			break;
+		case 'a':
+			req.cli_flags |= CLI_REQ_FLAG_ADD;
+			break;
 		case 'd':
 			req.cli_flags |= CLI_REQ_FLAG_DEL;
 			break;
@@ -108,10 +116,12 @@ int main(int argc, char *argv[])
 			break;
 		case '?':
 			cli_usage();
+			/* unreachable */
 		default:
 			fprintf(stderr, "getopt returned character code `%d'\n",
 				(int)c);
 			cli_usage();
+			/* unreachable */
 		}
 	}
 
@@ -120,12 +130,15 @@ int main(int argc, char *argv[])
 		while (optind < argc)
 			printf("%s ", argv[optind++]);
 
-		return EX_USAGE;
+		printf("%s", "\n");
+		cli_usage();
+		/* unreachable */
 	}
 
 	if (!req.key) {
-		fprintf(stderr, "missing argument -k\n");
-		return EX_USAGE;
+		fprintf(stderr, "missing `--key' option\n");
+		cli_usage();
+		/* unreachable */
 	}
 
 	memcached_st *m __attribute__((cleanup(cli_memcached_dtor))) =
@@ -184,13 +197,22 @@ int main(int argc, char *argv[])
 		return EX_NOHOST;
 	}
 
-	if (req.cli_flags & CLI_REQ_FLAG_DEL) {
+	return cli_execute(m, req);
+}
+
+int cli_execute(memcached_st *m, struct cli_request req)
+{
+	bool del = req.cli_flags & CLI_REQ_FLAG_DEL;
+	bool add = req.cli_flags & CLI_REQ_FLAG_ADD;
+
+	if (add && req.value)
+		return cli_add(m, req);
+	if (del)
 		return cli_del(m, req);
-	} else if (req.value) {
+	if (req.value)
 		return cli_set(m, req);
-	} else {
-		return cli_get(m, req);
-	}
+
+	return cli_get(m, req);
 }
 
 int cli_get(memcached_st *m, struct cli_request req)
@@ -205,10 +227,24 @@ int cli_get(memcached_st *m, struct cli_request req)
 	if (r != MEMCACHED_SUCCESS) {
 		fprintf(stderr, "memcached_get failed: %s\n",
 			memcached_strerror(m, r));
-		return EX_UNAVAILABLE;
+		return -r + EX__BASE;
 	}
 
 	fprintf(stdout, "%.*s", (int)vlen, (char *)v);
+
+	return EX_OK;
+}
+
+int cli_add(memcached_st *m, struct cli_request req)
+{
+	memcached_return r =
+	    memcached_add(m, req.key, strlen(req.key), req.value,
+			  strlen(req.value), req.expire, req.flags);
+	if (r != MEMCACHED_SUCCESS) {
+		fprintf(stderr, "memcached_add failed: %s\n",
+			memcached_strerror(m, r));
+		return -r + EX__BASE;
+	}
 
 	return EX_OK;
 }
@@ -221,7 +257,7 @@ int cli_set(memcached_st *m, struct cli_request req)
 	if (r != MEMCACHED_SUCCESS) {
 		fprintf(stderr, "memcached_set failed: %s\n",
 			memcached_strerror(m, r));
-		return EX_UNAVAILABLE;
+		return -r + EX__BASE;
 	}
 
 	return EX_OK;
@@ -234,7 +270,7 @@ int cli_del(memcached_st *m, struct cli_request req)
 	if (r != MEMCACHED_SUCCESS) {
 		fprintf(stderr, "memcached_delete failed: %s\n",
 			memcached_strerror(m, r));
-		return EX_UNAVAILABLE;
+		return -r + EX__BASE;
 	}
 
 	return EX_OK;
